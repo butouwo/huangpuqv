@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>老上海电影院指南</title>
+    <link rel="stylesheet" href="css/leaflet.css" />
+    <script src="js/leaflet.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap');
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Noto Serif SC', serif;
+            background-color: #f4f1ea;
+            color: #333;
+            display: flex;
+            height: 100vh;
+        }
+        
+        #sidebar {
+            width: 300px;
+            background-color: #d1c59c;
+            background-image: url("/page2/css/images/page2banm.png");
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid #ba4444;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        #map {
+            height: 55%;  /* 调整地图高度为50% */
+            border-bottom: 1px solid #8b8b8b;
+        }
+        
+        #detail {
+            height: 45%;  /* 相应调整详情区域高度 */
+            overflow-y: auto;
+            padding: 20px;
+            background-color: #f9f6f1;
+            background-image: url("css/images/page2banm.png");
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        
+        .cinema-list {
+            list-style: none;
+            padding: 0;
+            flex-grow: 1;
+            background-image: url("css/images/page2banm.png");
+        }
+        
+        .cinema-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f9f6f1;
+            border: 1px solid #8b8b8b;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 16px;
+        }
+        
+        .cinema-item:hover {
+            background-color: #e6e1d6;
+            transform: translateX(5px);
+        }
+        
+        .detail-content {
+            max-width: 800px;
+            margin: 0 auto;
+            column-count: 2;
+            column-gap: 40px;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        
+        .section {
+            break-inside: avoid;
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #8b8b8b;
+        }
+        
+        .cinema-image {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 40px;
+            filter: grayscale(100%);
+        }
+        
+        .timeline {
+            list-style: none;
+            padding-left: 20px;
+            border-left: 1px solid #8b8b8b;
+        }
+        
+        .timeline-item {
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            width: 10px;
+            height: 10px;
+            background: #333;
+            border-radius: 50%;
+            position: absolute;
+            left: -25px;
+            top: 5px;
+        }
+        
+        .date {
+            font-weight: 700;
+            margin-right: 10px;
+        }
+        
+        .leaflet-popup-content-wrapper {
+            background-color: #f9f6f1;
+            color: #333;
+            font-family: 'Noto Serif SC', serif;
+        }
+        
+        /* 返回按钮样式 */
+        .back-button {
+            display: block;
+            margin-top: 20px;
+            padding: 10px 15px;
+            background-color: #333;
+            color: #f4f1ea;
+            text-align: center;
+            text-decoration: none;
+            font-size: 16px;
+            transition: all 0.3s;
+            border: 1px solid #000;
+        }
+        
+        .back-button:hover {
+            background-color: #000;
+            color: #fff;
+        }
+
+        html {
+            filter: brightness(1.0);
+        }   
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div class="title">黄浦区老影院指南</div>
+        <a href="your-other-page-url.html" class="back-button">返回主页</a>
+        <ul class="cinema-list" id="cinemaList"></ul>
+        
+    </div>
+    <div id="content">
+        <div id="map"></div>
+        <div id="detail"></div>
+    </div>
+
+    <script>
+        const map = L.map('map').setView([31.2304, 121.4737], 12);
+        L.tileLayer('https://tile-b.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            minZoom:3,
+            maxZoom:  18,
+            subdomains:"1234"
+        }).addTo(map);
+
+        const cinemas = [
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: ["pppp/大光明.jpg"]
+            },
+            {
+                name: "上海影城",
+                location: [31.2289, 121.4589],
+                description: {
+                    history: "上海影城成立于1990年，是改革开放后上海现代化影院的杰出代表。其建成伊始就以先进的放映设备和舒适的观影环境闻名，成为上海新一代电影文化的重要象征。影城的诞生填补了上海缺少现代化大型影院的空白，开创了多厅影院的先河。",
+                    features: "影城共有18个不同规格的放映厅，其中包括两个IMAX厅和一个4D影厅。所有影厅都配备了杜比全景声系统，让观众能够享受到身临其境的观影体验。大堂采用挑高设计，墙上陈列着历年上海国际电影节的经典海报，处处彰显着浓厚的电影文化气息。",
+                    trivia: "这里是上海国际电影节的主会场之一，每年都会迎来众多国内外电影明星。1993年，著名导演贝托鲁奇来访时曾称赞这里的放映效果堪比欧洲一流影院。影城收藏了大量老式电影放映设备，在三楼设有专门的展览区域，向观众展示电影放映技术的演变历史。"
+                },
+                timeline: [
+                    { year: 1990, event: "上海影城正式开业，开创上海多厅影院先河" },
+                    { year: 1993, event: "成为上海国际电影节主会场" },
+                    { year: 2005, event: "安装首个IMAX巨幕影厅" },
+                    { year: 2010, event: "全面升级音响系统，引入杜比全景声技术" },
+                    { year: 2015, event: "举办25周年庆典，推出电影放映技术展" },
+                    { year: 2020, event: "完成智能化改造，推出无接触式服务" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+            {
+                name: "大光明电影院",
+                location: [31.2352, 121.4726],
+                description: {
+                    history: "大光明电影院始建于1930年，由匈牙利建筑师罗德尼设计，是上海乃至远东最具规模的电影院。其宏伟的建筑风格融合了古典主义与装饰艺术风格，见证了上海电影文化的黄金时代。在过去的数十年间，这座影院不仅是观众观影的场所，更是上海人集体记忆中不可磨灭的文化地标。",
+                    features: "影院保留了原有的新古典主义建筑风格，内部装潢富丽堂皇，天花板上的巨型水晶吊灯让人叹为观止。主厅可容纳近2000名观众，是上海最大的单厅电影院。音响系统经过多次升级，现已达到世界顶级水平，为观众提供极致的视听体验。",
+                    trivia: "1932年，卓别林的《城市之光》在此举行了亚洲首映。1949年，这里举办了新中国第一次公映电影的放映活动。在上世纪三十年代，门票最贵可达到5个大洋，是普通工人月工资的一半。著名演员阮玲玉经常光顾此处，据说她最喜欢坐在二楼左侧的位置观影。"
+                },
+                timeline: [
+                    { year: 1930, event: "大光明电影院盛大开业，上映首部有声电影《彩虹》" },
+                    { year: 1932, event: "举办卓别林《城市之光》亚洲首映式" },
+                    { year: 1949, event: "改建为综合性影剧院，成为新中国电影放映重地" },
+                    { year: 1994, event: "被列为上海市优秀历史建筑" },
+                    { year: 2010, event: "进行大规模修缮，保留历史风貌的同时升级设备" },
+                    { year: 2018, event: "重新开放，举办上海国际电影节开幕式" }
+                ],
+                image: "/api/placeholder/800/400"
+            },
+                                                
+        ];
+
+        const markers = {};
+        cinemas.forEach(cinema => {
+            const marker = L.marker(cinema.location).addTo(map);
+            markers[cinema.name] = marker;
+            
+            marker.on('click', () => showCinemaDetail(cinema));
+        });
+
+        function showCinemaDetail(cinema) {
+            const detailEl = document.getElementById('detail');
+            detailEl.innerHTML = `
+                <div class="title">${cinema.name}</div>
+                <div class="detail-content">
+                    <img src="${cinema.image}" alt="${cinema.name}" >
+                    <div class="section">
+                        <div class="section-title">简要介绍</div>
+                        <p>${cinema.description.history}</p>
+                    </div>
+                    <div class="section">
+                        <div class="section-title">特色亮点</div>
+                        <p>${cinema.description.features}</p>
+                    </div>
+                    <div class="section">
+                        <div class="section-title">趣闻轶事</div>
+                        <p>${cinema.description.trivia}</p>
+                    </div>
+                    <div class="section">
+                        <div class="section-title">时间长河</div>
+                        <ul class="timeline">
+                            ${cinema.timeline.map(item => `
+                                <li class="timeline-item">
+                                    <span class="date">${item.year}</span>
+                                    ${item.event}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+            map.setView(cinema.location, 15);
+        }
+
+        const cinemaList = document.getElementById('cinemaList');
+        cinemas.forEach(cinema => {
+            const li = document.createElement('li');
+            li.className = 'cinema-item';
+            li.textContent = cinema.name;
+            li.onclick = () => showCinemaDetail(cinema);
+            cinemaList.appendChild(li);
+        });
+
+        // 默认显示第一个电影院的详情
+        showCinemaDetail(cinemas[0]);
+    </script>
+</body>
+</html>

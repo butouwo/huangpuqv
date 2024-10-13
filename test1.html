@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>黄浦区老电影院地图</title>
+    <link rel="stylesheet" href="css/leaflet.css" />
+    <script src="js/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Old+Standard+TT:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: '楷体', serif;
+            background-color: #ffffff;
+            background-image: linear-gradient(rgba(4, 11, 21, 0.3), rgba(4, 11, 21, 0.3)), url("pppp/背景.png");
+            color: #2c2c2c;
+            background-size: auto;
+            background-position: center;
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 1400px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #fffdf7;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            background-image: url("pppp/ct3.png");
+        }
+        header {
+            text-align: center;
+            padding: 30px;
+            background-color: #764545;
+            color: #cac0a3;
+            background-image: url("pppp/ceshi8.png");
+            background-size: cover;
+        }
+        h1 {
+            font-family: '楷体', serif;
+            font-size: 56px;
+            margin: 0;
+            letter-spacing: 2px;
+        }
+        .subtitle {
+            font-family: "楷体";
+            margin-top: 10px;
+        }
+        #content {
+            display: flex;
+            flex-grow: 1;
+        }
+        #sidebar {
+            width: 250px;
+            min-width: 250px; /* 确保最小宽度 */
+            padding: 20px;
+            border-right: 2px solid #2c2c2c;
+            overflow-y: auto; /* 添加垂直滚动条 */
+        }
+        #main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* 防止内容溢出 */
+        }
+        #map {
+            height: 400px;
+            border: 2px solid #2c2c2c;
+            margin: 20px;
+        }
+        #info-panel {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            border-top: 2px solid #2c2c2c;
+        }
+        .cinema-name {
+            font-family: "楷体";
+            font-size: 26px;
+            cursor: pointer;
+            margin-bottom: 15px;
+            font-weight: bold;
+            text-decoration: underline;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .cinema-name:hover {
+            color: #8b0000;
+        }
+        #search-container {
+            margin-bottom: 20px;
+        }
+        #search-input {
+            width: 100%;
+            padding: 5px;
+            font-family: 'Old Standard TT', serif;
+            border: 2px solid #2c2c2c;
+            box-sizing: border-box; /* 确保宽度包含padding */
+        }
+        .photo-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .photo-container img {
+            width: 150px;
+            height: 150px;
+            object-fit: cover;
+            cursor: pointer;
+            border: 2px solid #2c2c2c;
+        }
+        #photo-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+        }
+        #photo-modal-content {
+            margin: auto;
+            display: block;
+            width: 80%;
+            max-width: 700px;
+            max-height: 80%;
+            object-fit: contain;
+        }
+        #photo-modal-close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        h2, h3 {
+            font-family: '楷体', serif;
+            border-bottom: 2px solid #2c2c2c;
+            padding-bottom: 5px;
+        }
+        p {
+            text-indent: 20px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <header>
+            <h1>黃浦區電影院地圖</h1>
+            <div class="subtitle">探 索 魔 都 的 银 幕 奇 迹</div>
+        </header>
+        <div id="content">
+            <div id="sidebar">
+                <div id="search-container">
+                    <input type="text" id="search-input" placeholder="搜索电影院...">
+                </div>
+                <div id="cinema-list"></div>
+            </div>
+            <div id="main-content">
+                <div id="map"></div>
+                <div id="info-panel">
+                    <h2>欢迎阅读黄浦区电影院专刊</h2>
+                    <p>亲爱的读者，欢迎您探索黄浦区的电影文化。点击左侧的电影院名称或地图上的标记，开启您的观影之旅。让我们一同穿越时空，领略每家影院的独特魅力！</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="photo-modal">
+        <span id="photo-modal-close">&times;</span>
+        <img id="photo-modal-content">
+    </div>
+
+    <script>
+        const cinemas = [
+            {
+                name: "国泰电影院（这是一个非常长的名字用来测试溢出效果）",
+                lat: 31.2304,
+                lng: 121.4737,
+                description: ["2、多次翻修，力求保留建筑风貌国泰大戏院建于1930年，由鸿达洋行设计，钢筋混凝土结构，外墙采用紫酱红的泰山砖，白色嵌缝，属典型的装饰艺术派风格。1937年8月4日起,国泰大戏院曾因内部装修而停映三个星期。2003年6月28日，国泰电影院完成了全面大改建，将原有978座平坡式的放映大厅改建成三个风格迥异、舒适豪华的阶梯式电影放映厅，更新或添置了智能设施。2013年6月底，国泰电影院经过一个多月的外立面整修和内部翻新之后重新开门迎客，此次外立面整修务求修旧如旧。",
+                               "3、肩负国际使命的老影院由于国泰的设施精良,一直是上海电影放映活动的主要场所之一,曾先后举办过亚洲电影周、苏联电影周、中外电影精品电影展映等活动。从1991年起,国泰成为上海国际电影节指定放映单位。",
+                               "4、国泰的人文温情国泰电影院每月至少为社区放映一场免费公益电影，还经常举办敬老专场、残疾人专场、学生专场等。2005年6月28日起实行星期二全天半价，2006年2月22日起在全市率先推出星期三也全天半价。"],
+                funFact: "曾多次承办国际电影节，是海内外影人汇聚的文化殿堂。",
+                history: "始建于1998年，2010年重装开业，引进IMAX巨幕，开创观影新纪元。",
+                photos: ["pppp/国泰2.webp", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            {
+                name: "光明影戏院",
+                lat: 31.2395,
+                lng: 121.4905,
+                description: "光明影戏院",
+                funFact: "光明影戏院",
+                history: "光明影戏院。",
+                photos: ["/api/placeholder/300/200", "/api/placeholder/300/200"]
+            },
+            // 可以继续添加更多电影院
+        ];
+
+        const map = L.map('map').setView([31.2304, 121.4737], 13);
+        L.tileLayer('https://tile-b.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        const cinemaList = document.getElementById('cinema-list');
+        const infoPanel = document.getElementById('info-panel');
+        const searchInput = document.getElementById('search-input');
+        const photoModal = document.getElementById('photo-modal');
+        const photoModalContent = document.getElementById('photo-modal-content');
+        const photoModalClose = document.getElementById('photo-modal-close');
+
+        cinemas.forEach(cinema => {
+            const marker = L.marker([cinema.lat, cinema.lng]).addTo(map);
+            marker.bindPopup(`<b>${cinema.name}</b>`);
+
+            const listItem = document.createElement('div');
+            listItem.className = 'cinema-name';
+            listItem.textContent = cinema.name;
+            listItem.title = cinema.name; // 添加 title 属性，以便在鼠标悬停时显示完整名称
+            listItem.addEventListener('click', () => {
+                map.setView([cinema.lat, cinema.lng], 15);
+                marker.openPopup();
+                showCinemaInfo(cinema);
+            });
+            cinemaList.appendChild(listItem);
+
+            marker.on('click', () => showCinemaInfo(cinema));
+        });
+
+        function showCinemaInfo(cinema) {
+            infoPanel.innerHTML = `
+                <h2>${cinema.name}</h2>
+                <h3>影院简介</h3>
+                <p>${cinema.description}</p>
+                <h3>趣闻轶事</h3>
+                <p>${cinema.funFact}</p>
+                <h3>历史沿革</h3>
+                <p>${cinema.history}</p>
+                <h3>影院剪影</h3>
+                <div class="photo-container">
+                    ${cinema.photos.map(photo => `<img src="${photo}" alt="${cinema.name}" onclick="openPhotoModal('${photo}')">`).join('')}
+                </div>
+            `;
+        }
+
+        function openPhotoModal(photoSrc) {
+            photoModal.style.display = 'block';
+            photoModalContent.src = photoSrc;
+        }
+
+        photoModalClose.onclick = function() {
+            photoModal.style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            if (event.target == photoModal) {
+                photoModal.style.display = 'none';
+            }
+        }
+
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const cinemaItems = cinemaList.getElementsByClassName('cinema-name');
+            for (let item of cinemaItems) {
+                const cinemaName = item.textContent.toLowerCase();
+                item.style.display = cinemaName.includes(searchTerm) ? '' : 'none';
+            }
+        });
+
+        window.addEventListener('resize', function() {
+            map.invalidateSize();
+        });
+    </script>
+</body>
+</html>
